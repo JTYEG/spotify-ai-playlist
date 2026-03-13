@@ -106,7 +106,10 @@ async function fetchSongs(prompt) {
     });
     const data = await resp.json();
     if (!resp.ok) {
-      setState(State.ERROR, { message: data.detail || `Error ${resp.status}` });
+      const msg = Array.isArray(data.detail)
+        ? data.detail.map(e => e.msg).join(", ")
+        : (data.detail || `Error ${resp.status}`);
+      setState(State.ERROR, { message: msg });
       return;
     }
     currentSongs = data.songs;
@@ -129,7 +132,10 @@ async function savePlaylist() {
     });
     const data = await resp.json();
     if (!resp.ok) {
-      setState(State.ERROR, { message: data.detail || `Error ${resp.status}` });
+      const msg = Array.isArray(data.detail)
+        ? data.detail.map(e => e.msg).join(", ")
+        : (data.detail || `Error ${resp.status}`);
+      setState(State.ERROR, { message: msg });
       return;
     }
     setState(State.SUCCESS, {
