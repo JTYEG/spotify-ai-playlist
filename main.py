@@ -263,7 +263,7 @@ async def auth_logout(request: Request):
 
 
 # ---------------------------------------------------------------------------
-# Main playlist generation endpoint
+# Endpoints
 # ---------------------------------------------------------------------------
 
 class GenerateRequest(BaseModel):
@@ -271,17 +271,39 @@ class GenerateRequest(BaseModel):
     song_count: int = 15
 
 
-@app.post("/api/generate-playlist")
-async def generate_playlist(request: Request, body: GenerateRequest):
-    session = get_session(request)
-    if not session:
+class SaveRequest(BaseModel):
+    prompt: str
+    songs: list[dict]
+
+
+@app.post("/api/get-songs")
+async def get_songs(request: Request, body: GenerateRequest):
+    """Step 1: Ask Claude for songs and return the list for preview."""
+    if not get_session(request):
         raise HTTPException(status_code=401, detail="Not logged in")
 
     prompt = body.prompt.strip()
     if not prompt:
         raise HTTPException(status_code=400, detail="Prompt cannot be empty")
 
-    # Refresh token if needed
+    song_count = max(5, min(50, body.song_count))
+    try:
+        songs = get_songs_from_claude(prompt, song_count)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Claude error: {str(e)}")
+
+    return JSONResponse({"songs": songs})
+
+
+@app.post("/api/save-playlist")
+async def save_playlist(request: Request, body: SaveRequest):
+    """Step 2: Search Spotify for the confirmed song list and create the playlist."""
+    import asyncio
+
+    session = get_session(request)
+    if not session:
+        raise HTTPException(status_code=401, detail="Not logged in")
+
     try:
         session = await refresh_token_if_needed(session)
     except Exception:
@@ -290,46 +312,32 @@ async def generate_playlist(request: Request, body: GenerateRequest):
     access_token = session["access_token"]
     user_id = session["user_id"]
 
-    song_count = max(5, min(50, body.song_count))  # clamp between 5 and 50
-
-    # Step 1: Get songs from Claude
-    try:
-        songs = get_songs_from_claude(prompt, song_count)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Claude error: {str(e)}")
-
-    # Step 2: Search all tracks concurrently
-    import asyncio
     search_results = await asyncio.gather(
-        *[search_track(s["title"], s["artist"], access_token) for s in songs],
+        *[search_track(s["title"], s["artist"], access_token) for s in body.songs],
         return_exceptions=True,
     )
 
-    uris = []
-    not_found = []
-    for song, uri in zip(songs, search_results):
+    uris, not_found = [], []
+    for song, uri in zip(body.songs, search_results):
         if uri and isinstance(uri, str):
             uris.append(uri)
         else:
             not_found.append(f"{song['title']} - {song['artist']}")
 
     if not uris:
-        raise HTTPException(status_code=502, detail="No tracks found on Spotify for any of Claude's suggestions")
+        raise HTTPException(status_code=502, detail="No tracks found on Spotify for any of the suggested songs")
 
-    # Step 3: Create playlist
-    playlist_name = f"AI Mix: {prompt[:50]}"
+    playlist_name = f"AI Mix: {body.prompt[:50]}"
     try:
         playlist = await create_playlist(user_id, playlist_name, access_token)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Failed to create playlist: {str(e)}")
 
-    # Step 4: Add tracks
     try:
         await add_tracks_to_playlist(playlist["id"], uris, access_token)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Failed to add tracks: {str(e)}")
 
-    # Update session cookie with potentially refreshed token
     response = JSONResponse({
         "playlist_url": playlist["url"],
         "playlist_name": playlist_name,

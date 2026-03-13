@@ -260,7 +260,7 @@ textarea::placeholder {
 
 /* Spacing between stacked buttons */
 #btn-generate {
-  margin-top: 4px;
+  margin-top: 20px;
 }
 
 /* Song count slider */
@@ -296,4 +296,42 @@ textarea::placeholder {
 
 #btn-regenerate {
   margin-top: 4px;
+}
+
+/* Preview card */
+.preview-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.song-list {
+  list-style: decimal;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.song-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 14px;
+}
+
+.song-title {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.song-artist {
+  color: var(--text-muted);
+  font-size: 12px;
 }

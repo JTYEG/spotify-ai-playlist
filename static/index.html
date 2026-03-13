@@ -51,7 +51,16 @@
       <!-- LOADING STATE -->
       <div id="section-loading" class="hidden">
         <div class="spinner"></div>
-        <p class="loading-text">Claude is picking songs&hellip;</p>
+        <p class="loading-text" id="loading-text">Claude is picking songs&hellip;</p>
+      </div>
+
+      <!-- PREVIEW STATE -->
+      <div id="section-preview" class="hidden preview-card">
+        <p class="result-label">Claude's picks — looking good?</p>
+        <ol id="preview-list" class="song-list"></ol>
+        <button id="btn-save" class="btn btn-spotify">Save to Spotify</button>
+        <button id="btn-regenerate" class="btn btn-ghost">Regenerate</button>
+        <button id="btn-another" class="btn btn-ghost">Start over</button>
       </div>
 
       <!-- SUCCESS STATE -->
@@ -62,7 +71,6 @@
         <a id="result-link" href="#" target="_blank" rel="noopener" class="btn btn-outline">
           Open in Spotify
         </a>
-        <button id="btn-regenerate" class="btn btn-ghost">Regenerate</button>
         <button id="btn-another" class="btn btn-ghost">Make another</button>
       </div>
 

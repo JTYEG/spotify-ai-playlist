@@ -1,5 +1,5 @@
-// State machine: LOGGED_OUT → LOGGED_IN → LOADING → SUCCESS | ERROR
-const State = { LOGGED_OUT: 0, LOGGED_IN: 1, LOADING: 2, SUCCESS: 3, ERROR: 4 };
+// State machine: LOGGED_OUT → LOGGED_IN → LOADING → PREVIEW → SAVING → SUCCESS | ERROR
+const State = { LOGGED_OUT: 0, LOGGED_IN: 1, LOADING: 2, PREVIEW: 3, SAVING: 4, SUCCESS: 5, ERROR: 6 };
 
 const $ = (id) => document.getElementById(id);
 
@@ -11,13 +11,17 @@ const els = {
   btnLogout:        $("btn-logout"),
   btnAnother:       $("btn-another"),
   btnRegenerate:    $("btn-regenerate"),
+  btnSave:          $("btn-save"),
   btnRetry:         $("btn-retry"),
   welcomeText:      $("welcome-text"),
   promptInput:      $("prompt-input"),
   promptError:      $("prompt-error"),
   songCount:        $("song-count"),
   songCountLabel:   $("song-count-label"),
+  loadingText:      $("loading-text"),
   sectionLoading:   $("section-loading"),
+  sectionPreview:   $("section-preview"),
+  previewList:      $("preview-list"),
   sectionSuccess:   $("section-success"),
   sectionError:     $("section-error"),
   resultName:       $("result-name"),
@@ -27,12 +31,13 @@ const els = {
 };
 
 let lastPrompt = "";
+let currentSongs = [];
 
 function setState(state, payload = {}) {
-  // Reset all dynamic sections
   els.sectionLoggedOut.classList.add("hidden");
   els.sectionLoggedIn.classList.add("hidden");
   els.sectionLoading.classList.add("hidden");
+  els.sectionPreview.classList.add("hidden");
   els.sectionSuccess.classList.add("hidden");
   els.sectionError.classList.add("hidden");
   els.promptError.classList.add("hidden");
@@ -52,7 +57,19 @@ function setState(state, payload = {}) {
   if (state === State.LOADING) {
     els.sectionLoggedIn.classList.remove("hidden");
     els.sectionLoading.classList.remove("hidden");
+    els.loadingText.textContent = payload.message || "Claude is picking songs\u2026";
     els.btnGenerate.disabled = true;
+  }
+
+  if (state === State.PREVIEW) {
+    els.sectionLoggedIn.classList.remove("hidden");
+    els.sectionPreview.classList.remove("hidden");
+    els.previewList.innerHTML = "";
+    (payload.songs || []).forEach(song => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="song-title">${song.title}</span><span class="song-artist">${song.artist}</span>`;
+      els.previewList.appendChild(li);
+    });
   }
 
   if (state === State.SUCCESS) {
@@ -75,29 +92,37 @@ function setState(state, payload = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Event handlers
+// Core actions
 // ---------------------------------------------------------------------------
 
-els.btnLogin.addEventListener("click", () => {
-  window.location.href = "/auth/login";
-});
-
-els.btnLogout.addEventListener("click", () => {
-  window.location.href = "/auth/logout";
-});
-
-els.songCount.addEventListener("input", () => {
-  els.songCountLabel.textContent = els.songCount.value;
-});
-
-async function generatePlaylist(prompt) {
-  setState(State.LOADING);
+async function fetchSongs(prompt) {
+  setState(State.LOADING, { message: "Claude is picking songs\u2026" });
   const song_count = parseInt(els.songCount.value, 10);
   try {
-    const resp = await fetch("/api/generate-playlist", {
+    const resp = await fetch("/api/get-songs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt, song_count }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      setState(State.ERROR, { message: data.detail || `Error ${resp.status}` });
+      return;
+    }
+    currentSongs = data.songs;
+    setState(State.PREVIEW, { songs: currentSongs });
+  } catch {
+    setState(State.ERROR, { message: "Network error — please check your connection and try again." });
+  }
+}
+
+async function savePlaylist() {
+  setState(State.LOADING, { message: "Saving to Spotify\u2026" });
+  try {
+    const resp = await fetch("/api/save-playlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: lastPrompt, songs: currentSongs }),
     });
     const data = await resp.json();
     if (!resp.ok) {
@@ -110,10 +135,21 @@ async function generatePlaylist(prompt) {
       tracksFound: data.tracks_found,
       tracksNotFound: data.tracks_not_found,
     });
-  } catch (err) {
+  } catch {
     setState(State.ERROR, { message: "Network error — please check your connection and try again." });
   }
 }
+
+// ---------------------------------------------------------------------------
+// Event handlers
+// ---------------------------------------------------------------------------
+
+els.btnLogin.addEventListener("click", () => { window.location.href = "/auth/login"; });
+els.btnLogout.addEventListener("click", () => { window.location.href = "/auth/logout"; });
+
+els.songCount.addEventListener("input", () => {
+  els.songCountLabel.textContent = els.songCount.value;
+});
 
 els.btnGenerate.addEventListener("click", () => {
   const prompt = els.promptInput.value.trim();
@@ -124,29 +160,29 @@ els.btnGenerate.addEventListener("click", () => {
   }
   els.promptError.classList.add("hidden");
   lastPrompt = prompt;
-  generatePlaylist(prompt);
+  fetchSongs(prompt);
 });
 
+els.btnSave.addEventListener("click", () => savePlaylist());
+
 els.btnRegenerate.addEventListener("click", () => {
-  if (lastPrompt) generatePlaylist(lastPrompt);
+  if (lastPrompt) fetchSongs(lastPrompt);
 });
 
 els.btnAnother.addEventListener("click", () => {
   els.promptInput.value = "";
+  currentSongs = [];
   setState(State.LOGGED_IN);
   els.promptInput.focus();
 });
 
-els.btnRetry.addEventListener("click", () => {
-  setState(State.LOGGED_IN);
-});
+els.btnRetry.addEventListener("click", () => setState(State.LOGGED_IN));
 
 // ---------------------------------------------------------------------------
-// Init: check login status
+// Init
 // ---------------------------------------------------------------------------
 
 async function init() {
-  // Show login error from OAuth redirect if present
   const params = new URLSearchParams(window.location.search);
   const oauthError = params.get("error");
 
@@ -162,11 +198,10 @@ async function init() {
     } else {
       setState(State.LOGGED_OUT);
       if (oauthError) {
-        // Show error below the login button
         const errEl = document.createElement("p");
         errEl.style.cssText = "color:#e74c3c;margin-top:1rem;font-size:.9rem;";
         errEl.textContent = `Login error: ${oauthError}`;
-        document.getElementById("section-logged-out").appendChild(errEl);
+        $("section-logged-out").appendChild(errEl);
       }
     }
   } catch {
