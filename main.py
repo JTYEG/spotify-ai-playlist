@@ -274,6 +274,7 @@ class GenerateRequest(BaseModel):
 class SaveRequest(BaseModel):
     prompt: str
     songs: list[dict]
+    playlist_name: str = ""
 
 
 @app.post("/api/get-songs")
@@ -327,7 +328,7 @@ async def save_playlist(request: Request, body: SaveRequest):
     if not uris:
         raise HTTPException(status_code=502, detail="No tracks found on Spotify for any of the suggested songs")
 
-    playlist_name = f"AI Mix: {body.prompt[:50]}"
+    playlist_name = body.playlist_name.strip() or f"AI Mix: {body.prompt[:50]}"
     try:
         playlist = await create_playlist(user_id, playlist_name, access_token)
     except Exception as e:

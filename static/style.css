@@ -335,3 +335,40 @@ textarea::placeholder {
   color: var(--text-muted);
   font-size: 12px;
 }
+
+/* Playlist name input */
+.playlist-name-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.playlist-name-group label {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.playlist-name-row {
+  display: flex;
+  align-items: center;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.playlist-name-prefix {
+  padding: 10px 10px 10px 14px;
+  font-size: 14px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.playlist-name-row input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 14px;
+  padding: 10px 14px 10px 4px;
+}

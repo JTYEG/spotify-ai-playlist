@@ -19,6 +19,7 @@ const els = {
   promptError:      $("prompt-error"),
   songCount:        $("song-count"),
   songCountLabel:   $("song-count-label"),
+  playlistNameInput: $("playlist-name-input"),
   loadingText:      $("loading-text"),
   sectionLoading:   $("section-loading"),
   sectionPreview:   $("section-preview"),
@@ -119,11 +120,13 @@ async function fetchSongs(prompt) {
 
 async function savePlaylist() {
   setState(State.LOADING, { message: "Saving to Spotify\u2026" });
+  const nameSuffix = els.playlistNameInput.value.trim();
+  const playlist_name = nameSuffix ? `AI Mix: ${nameSuffix}` : `AI Mix: ${lastPrompt.slice(0, 50)}`;
   try {
     const resp = await fetch("/api/save-playlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: lastPrompt, songs: currentSongs }),
+      body: JSON.stringify({ prompt: lastPrompt, songs: currentSongs, playlist_name }),
     });
     const data = await resp.json();
     if (!resp.ok) {
