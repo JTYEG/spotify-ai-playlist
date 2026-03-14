@@ -2,7 +2,9 @@
 
 Generate Spotify playlists from natural language prompts using Claude AI. Describe a mood, artist, vibe, or any musical idea — Claude picks the songs, Spotify builds the playlist.
 
-![App screenshot](docs/screenshot.png)
+<p align="center">
+  <img src="docs/screenshot.png" alt="App screenshot" />
+</p>
 
 ## What it does
 
