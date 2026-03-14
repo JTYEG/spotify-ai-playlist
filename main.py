@@ -212,11 +212,11 @@ async def build_candidate_pool(seed_track: str, seed_artist: str) -> dict:
         tags = await _lfm_artist_top_tags(norm_artist)
 
     # 4. Similar artists
-    similar_artists = await _lfm_similar_artists(norm_artist, limit=10)
+    similar_artists = await _lfm_similar_artists(norm_artist, limit=7)
 
-    # 5. Top 3 tracks for each similar artist
+    # 5. Top 2 tracks for each similar artist
     artist_track_lists = await asyncio.gather(
-        *[_lfm_artist_top_tracks(a, limit=3) for a in similar_artists]
+        *[_lfm_artist_top_tracks(a, limit=2) for a in similar_artists]
     )
 
     # 6. Merge all candidate tracks
@@ -259,25 +259,16 @@ def rank_candidates_with_claude(
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
     mode_instruction = RANK_MODE_INSTRUCTIONS.get(mode, RANK_MODE_INSTRUCTIONS["adjacent_discovery"])
+    if tags:
+        mode_instruction += f" Track tags for context: {', '.join(tags[:4])}."
     if description:
         mode_instruction += f" Additional context: {description}"
 
     payload = {
-        "task": f"Rank the best {count} candidate tracks for similarity to the seed track, then return them in order of best fit.",
+        "task": f"Rank and return the best {count} candidate tracks in order of best fit to the seed.",
         "seed": {"artist": seed["artist"], "track": seed["track"]},
         "mode": mode_instruction,
-        "tags": tags,
         "candidate_tracks": [{"artist": c["artist"], "track": c["track"]} for c in candidates],
-        "rules": [
-            "Only use candidate_tracks",
-            "Return JSON only",
-            "Do not add commentary",
-            "Do not include the seed track",
-            "Do not repeat the same artist more than twice",
-        ],
-        "output_schema": {
-            "ranked_tracks": [{"artist": "string", "track": "string"}]
-        },
     }
 
     response = client.messages.create(
@@ -490,10 +481,11 @@ async def get_songs(request: Request, body: GenerateRequest):
     if not pool["candidates"]:
         raise HTTPException(status_code=502, detail="No candidates found on Last.fm for this seed")
 
-    # Claude ranks 25 candidates (fixed buffer for Spotify verification fallback)
+    # Ask Claude to rank 2× requested songs for Spotify verification fallback
+    rank_count = min(song_count * 2, len(pool["candidates"]))
     try:
         ranked = rank_candidates_with_claude(
-            pool["seed"], pool["tags"], mode, description, pool["candidates"], count=25
+            pool["seed"], pool["tags"], mode, description, pool["candidates"], count=rank_count
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Claude error: {str(e)}")
