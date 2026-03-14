@@ -18,7 +18,6 @@ const els = {
   seedInput:        $("seed-input"),
   promptInput:      $("prompt-input"),
   promptError:      $("prompt-error"),
-  showReasons:      $("show-reasons"),
   songCount:        $("song-count"),
   songCountLabel:   $("song-count-label"),
   discoveryMode:    $("discovery-mode"),
@@ -116,7 +115,7 @@ async function fetchSongs(prompt) {
     const resp = await fetch("/api/get-songs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, seed, song_count, mode, show_reasons: els.showReasons.checked }),
+      body: JSON.stringify({ prompt, seed, song_count, mode }),
     });
     const data = await resp.json();
     if (!resp.ok) {
