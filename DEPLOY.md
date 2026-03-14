@@ -30,6 +30,7 @@ SPOTIFY_CLIENT_ID=your_spotify_client_id
 SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 SPOTIFY_REDIRECT_URI=https://<your-render-domain>.onrender.com/callback
 SECRET_KEY=some-long-random-string
+LASTFM_API_KEY=your_lastfm_api_key
 ```
 
 ### 5. Deploy
