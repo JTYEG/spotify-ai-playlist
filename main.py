@@ -29,7 +29,7 @@ SPOTIFY_API_BASE = "https://api.spotify.com/v1"
 app = FastAPI()
 signer = URLSafeTimedSerializer(SECRET_KEY)
 
-CLAUDE_SYSTEM_PROMPT = """YYou are a music recommendation engine focused on ACCURATE song similarity.
+CLAUDE_SYSTEM_PROMPT = """You are a music recommendation engine focused on ACCURATE song similarity.
 
 Your job is to recommend songs that are most likely to feel genuinely similar to the user's input, not just culturally related or critically associated.
 
@@ -61,7 +61,10 @@ Internally determine:
 - closest comparable artists
 - whether the request is asking for similarity, influence, mood, or discovery
 
-Then return the best matches."""
+Then return the best matches.
+
+CRITICAL: Respond with ONLY a JSON array. Each item has 'title' and 'artist' keys. No explanations, no markdown, no code blocks — just the raw JSON array.
+Example: [{"title": "Piano Man", "artist": "Billy Joel"}]"""
 
 # ---------------------------------------------------------------------------
 # Session helpers (signed cookie, no database)
