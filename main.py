@@ -43,10 +43,9 @@ Rules:
 - ONLY use tracks from candidate_tracks. Never invent or add songs not in the list.
 - Do not include the seed track itself.
 - Do not repeat the same artist more than twice.
-- For each track include a "reason" field: 3-5 words explaining why it fits.
 - Return ONLY valid JSON matching the output_schema. No explanations, no markdown, no code blocks.
 
-Example output: {"ranked_tracks": [{"artist": "New Order", "track": "Blue Monday", "reason": "icy synth, detached vocals"}]}"""
+Example output: {"ranked_tracks": [{"artist": "New Order", "track": "Blue Monday"}]}"""
 
 RANK_MODE_INSTRUCTIONS = {
     "tight_match":        "Rank by closest sonic and mood similarity to the seed. Prioritize tracks that feel nearly identical in style, energy, and production.",
@@ -353,6 +352,7 @@ def rank_candidates_with_claude(
     candidates: list[dict],
     count: int = 20,
     blend_context: str = "",
+    show_reasons: bool = False,
 ) -> list[dict]:
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
@@ -364,18 +364,28 @@ def rank_candidates_with_claude(
     if description:
         mode_instruction += f" Context: {description}"
 
+    if show_reasons:
+        output_schema = {"ranked_tracks": [{"artist": "string", "track": "string", "reason": "3-5 words"}]}
+        system = CLAUDE_SYSTEM_PROMPT.replace(
+            "- Return ONLY valid JSON",
+            "- For each track include a \"reason\" field: 3-5 words explaining why it fits.\n- Return ONLY valid JSON",
+        )
+    else:
+        output_schema = {"ranked_tracks": [{"artist": "string", "track": "string"}]}
+        system = CLAUDE_SYSTEM_PROMPT
+
     payload = {
         "task": f"Rank and return the best {count} candidate tracks in order of best fit to the seed.",
         "seed": {"artist": seed["artist"], "track": seed["track"]},
         "mode": mode_instruction,
         "candidate_tracks": [{"artist": c["artist"], "track": c["track"]} for c in candidates],
-        "output_schema": {"ranked_tracks": [{"artist": "string", "track": "string", "reason": "3-5 words"}]},
+        "output_schema": output_schema,
     }
 
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=1024,
-        system=CLAUDE_SYSTEM_PROMPT,
+        system=system,
         messages=[{"role": "user", "content": json.dumps(payload)}],
     )
     content = response.content[0].text.strip()
@@ -540,6 +550,7 @@ class GenerateRequest(BaseModel):
     prompt: str = ""                   # optional extra context for ranking
     song_count: int = 15
     mode: str = "adjacent_discovery"
+    show_reasons: bool = False
 
 
 class SaveRequest(BaseModel):
@@ -594,7 +605,7 @@ async def get_songs(request: Request, body: GenerateRequest):
     try:
         ranked = rank_candidates_with_claude(
             pool["seed"], pool["tags"], mode, description, pool["candidates"],
-            count=rank_count, blend_context=blend_context,
+            count=rank_count, blend_context=blend_context, show_reasons=body.show_reasons,
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Claude error: {str(e)}")
@@ -604,14 +615,16 @@ async def get_songs(request: Request, body: GenerateRequest):
     for song in ranked:
         result = await search_track(song["track"], song["artist"], access_token)
         if result:
-            found.append({
+            entry = {
                 "title":        song["track"],
                 "artist":       song["artist"],
                 "uri":          result["uri"],
                 "spotify_id":   result["spotify_id"],
                 "external_url": result["external_url"],
-                "reason":       song.get("reason", ""),
-            })
+            }
+            if body.show_reasons and song.get("reason"):
+                entry["reason"] = song["reason"]
+            found.append(entry)
         if len(found) >= song_count:
             break
 

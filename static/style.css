@@ -286,6 +286,26 @@ input[type="text"]::placeholder {
   margin-top: 20px;
 }
 
+.toggle-group {
+  margin-top: 16px;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+  accent-color: var(--green);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
 /* Song count slider */
 .slider-group {
   display: flex;
