@@ -365,13 +365,11 @@ def rank_candidates_with_claude(
         mode_instruction += f" Context: {description}"
 
     if show_reasons:
-        output_schema = {"ranked_tracks": [{"artist": "string", "track": "string", "reason": "3-5 words"}]}
         system = CLAUDE_SYSTEM_PROMPT.replace(
             "- Return ONLY valid JSON",
             "- For each track include a \"reason\" field: 3-5 words explaining why it fits.\n- Return ONLY valid JSON",
         )
     else:
-        output_schema = {"ranked_tracks": [{"artist": "string", "track": "string"}]}
         system = CLAUDE_SYSTEM_PROMPT
 
     payload = {
@@ -379,12 +377,11 @@ def rank_candidates_with_claude(
         "seed": {"artist": seed["artist"], "track": seed["track"]},
         "mode": mode_instruction,
         "candidate_tracks": [{"artist": c["artist"], "track": c["track"]} for c in candidates],
-        "output_schema": output_schema,
     }
 
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=1024,
+        max_tokens=600,
         system=system,
         messages=[{"role": "user", "content": json.dumps(payload)}],
     )
