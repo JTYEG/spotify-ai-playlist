@@ -19,6 +19,9 @@ const els = {
   promptError:      $("prompt-error"),
   songCount:        $("song-count"),
   songCountLabel:   $("song-count-label"),
+  discoveryMode:    $("discovery-mode"),
+  discoveryLabel:   $("discovery-label"),
+  discoveryDesc:    $("discovery-desc"),
   playlistNameInput: $("playlist-name-input"),
   loadingText:      $("loading-text"),
   sectionLoading:   $("section-loading"),
@@ -30,6 +33,12 @@ const els = {
   resultCount:      $("result-count"),
   resultLink:       $("result-link"),
   errorMessage:     $("error-message"),
+};
+
+const DISCOVERY_MODES = {
+  1: { key: "tight_match",        label: "Close",      desc: "Songs that sound nearly identical — same vibe, same era, minimal deviation." },
+  2: { key: "adjacent_discovery", label: "Adjacent",   desc: "Familiar feel, new finds — songs that share your input's DNA but expand your map." },
+  3: { key: "left_field",         label: "Left Field", desc: "Adventurous picks — unexpected genres and eras with underlying musical kinship." },
 };
 
 let lastPrompt = "";
@@ -98,11 +107,12 @@ function setState(state, payload = {}) {
 async function fetchSongs(prompt) {
   setState(State.LOADING, { message: "Claude is picking songs and checking Spotify\u2026" });
   const song_count = parseInt(els.songCount.value, 10);
+  const mode = DISCOVERY_MODES[els.discoveryMode.value]?.key ?? "adjacent_discovery";
   try {
     const resp = await fetch("/api/get-songs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, song_count }),
+      body: JSON.stringify({ prompt, song_count, mode }),
     });
     const data = await resp.json();
     if (!resp.ok) {
@@ -157,6 +167,12 @@ els.btnLogout.addEventListener("click", () => { window.location.href = "/auth/lo
 
 els.songCount.addEventListener("input", () => {
   els.songCountLabel.textContent = els.songCount.value;
+});
+
+els.discoveryMode.addEventListener("input", () => {
+  const m = DISCOVERY_MODES[els.discoveryMode.value];
+  els.discoveryLabel.textContent = m.label;
+  els.discoveryDesc.textContent = m.desc;
 });
 
 els.btnGenerate.addEventListener("click", () => {

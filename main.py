@@ -29,42 +29,47 @@ SPOTIFY_API_BASE = "https://api.spotify.com/v1"
 app = FastAPI()
 signer = URLSafeTimedSerializer(SECRET_KEY)
 
-CLAUDE_SYSTEM_PROMPT = """You are a music recommendation engine focused on ACCURATE song similarity.
+CLAUDE_SYSTEM_PROMPT = """You are a music recommendation engine.
 
-Your job is to recommend songs that are most likely to feel genuinely similar to the user's input, not just culturally related or critically associated.
+Recommend songs based on the user's requested mode and seed.
 
-Primary recommendation priority, in order:
-1. Sonic similarity — production style, instrumentation, tempo/energy, texture, rhythm, vocal delivery.
-2. Emotional similarity — mood, atmosphere, intensity, tone.
-3. Musical similarity — melody, harmony, arrangement, song structure.
-4. Genre/subgenre fit.
-5. Era/context only when it improves similarity.
-6. Influences, descendants, and historical lineage only when the songs also sound meaningfully similar.
+Prioritize:
+1. sonic similarity
+2. mood and atmosphere
+3. instrumentation and production
+4. genre/subgenre fit
+5. historical or stylistic lineage only when it improves the musical match
 
 Rules:
-- Prioritize songs that SOUND and FEEL similar over songs that are merely historically connected.
-- Do not recommend a song just because the artist was an influence, descendant, peer, or in the same scene.
-- Do not force obscure picks if more obvious songs are more accurate.
 - Avoid duplicates.
-- Avoid overloading the list with the same artist unless the user explicitly wants that.
-- Prefer precision over cleverness.
-- If the request is “songs like this song,” prioritize track-level similarity.
-- If the request is “songs like this artist,” prioritize songs that represent that artist’s most defining sound.
-- If the request is “artist influences,” recommend songs by artists who clearly influenced the input artist’s sound.
-- If the request is “deeper cuts,” exclude the biggest mainstream hits unless necessary.
-
-Internally determine:
-- core genre/subgenre
-- mood/energy
-- instrumentation/production traits
-- vocal style
-- closest comparable artists
-- whether the request is asking for similarity, influence, mood, or discovery
+- Avoid more than 2 songs by the same artist unless requested.
+- Prefer musically credible recommendations over generic obvious picks.
+- Return ONLY a JSON array.
+- Each item must contain:
+ 
 
 Then return the best matches.
 
 CRITICAL: Respond with ONLY a JSON array. Each item has 'title' and 'artist' keys. No explanations, no markdown, no code blocks — just the raw JSON array.
 Example: [{"title": "Piano Man", "artist": "Billy Joel"}]"""
+
+MODE_PROMPTS = {
+    "tight_match": (
+        "DISCOVERY MODE: tight_match — Stay as close as possible to the input. "
+        "Recommend songs that are near-identical in sound, production, mood, tempo, and genre. "
+        "Same instrumentation style, same emotional register, same general era. Minimal deviation."
+    ),
+    "adjacent_discovery": (
+        "DISCOVERY MODE: adjacent_discovery — Balance familiarity with discovery. "
+        "Recommend songs that clearly share musical DNA with the input but introduce the listener "
+        "to adjacent artists, subgenres, or eras they may not know."
+    ),
+    "left_field": (
+        "DISCOVERY MODE: left_field — Be adventurous. Recommend songs that share underlying musical or emotional DNA "
+        "with the input but come from unexpected genres, eras, or subcultures. "
+        "Make connections that aren't obvious but are musically defensible. Push well beyond the expected."
+    ),
+}
 
 # ---------------------------------------------------------------------------
 # Session helpers (signed cookie, no database)
@@ -130,9 +135,11 @@ async def refresh_token_if_needed(session: dict) -> dict:
 # Claude helper
 # ---------------------------------------------------------------------------
 
-def get_songs_from_claude(prompt: str, song_count: int = 15) -> list[dict]:
+def get_songs_from_claude(prompt: str, song_count: int = 15, mode: str = "adjacent_discovery") -> list[dict]:
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    mode_instruction = MODE_PROMPTS.get(mode, MODE_PROMPTS["adjacent_discovery"])
     user_message = (
+        f"{mode_instruction}\n\n"
         f'Generate {song_count} song recommendations for a playlist described as: "{prompt}"\n\n'
         f"Return exactly {song_count} songs as a JSON array with 'title' and 'artist' keys only. "
         "Make them well-known enough to be findable on Spotify. "
@@ -299,6 +306,7 @@ async def auth_logout(request: Request):
 class GenerateRequest(BaseModel):
     prompt: str
     song_count: int = 15
+    mode: str = "adjacent_discovery"
 
 
 class SaveRequest(BaseModel):
@@ -327,8 +335,10 @@ async def get_songs(request: Request, body: GenerateRequest):
     access_token = session["access_token"]
     song_count = max(5, min(50, body.song_count))
 
+    mode = body.mode if body.mode in ("tight_match", "adjacent_discovery", "left_field") else "adjacent_discovery"
+
     try:
-        songs = get_songs_from_claude(prompt, song_count)
+        songs = get_songs_from_claude(prompt, song_count, mode)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Claude error: {str(e)}")
 

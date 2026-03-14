@@ -307,6 +307,30 @@ textarea::placeholder {
   margin-top: 4px;
 }
 
+/* Discovery slider */
+.discovery-group {
+  margin-top: 16px;
+}
+
+.discovery-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.discovery-ticks span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.discovery-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.5;
+  min-height: 2.5em;
+}
+
 /* Preview card */
 .preview-card {
   background: var(--surface);
