@@ -4,10 +4,22 @@ Generate Spotify playlists from natural language prompts using Claude AI. Descri
 
 ## What it does
 
-1. You type a prompt (e.g. *"songs like Radiohead's OK Computer"* or *"late night driving, melancholic indie"*)
-2. Claude AI selects songs that genuinely match the sound and feel you described
-3. The app searches Spotify to verify each track exists
-4. You preview the list, name the playlist, and save it directly to your Spotify account
+1. You describe a sound, mood, or artist in plain text (e.g. *"songs like Radiohead's OK Computer"*)
+2. You pick a discovery mode to control how adventurous the recommendations are
+3. Claude AI selects songs based on the mode and your description
+4. The app searches Spotify to verify each track exists
+5. You preview the list, name the playlist, and save it directly to your Spotify account
+
+## Discovery modes
+
+A slider lets you control how Claude interprets your prompt:
+
+| Mode | Behaviour |
+|---|---|
+| **Similar** | Songs that sound very close — same mood, instrumentation, and energy. Accuracy over discovery. |
+| **Explore** | Starts close, then branches into adjacent artists, subgenres, and scenes. |
+| **Influences** | Traces the musical lineage — artists and songs that shaped the described sound. |
+| **Surprise** | Unexpected connections that still make musical sense. Anything goes. |
 
 ## Tech stack
 
@@ -74,7 +86,7 @@ See [DEPLOY.md](DEPLOY.md) for instructions on deploying to Render.
 
 ## How the AI recommendation works
 
-Claude is instructed to prioritize songs that **sound and feel** similar to the input — not just songs that are historically or culturally connected. The recommendation priority is:
+Each discovery mode sends Claude a structured task prompt that defines exactly what kind of recommendation to make. Claude prioritizes:
 
 1. Sonic similarity (production, instrumentation, tempo, texture)
 2. Emotional similarity (mood, atmosphere, intensity)
@@ -82,7 +94,7 @@ Claude is instructed to prioritize songs that **sound and feel** similar to the 
 4. Genre/subgenre fit
 5. Era and historical context (only when it improves accuracy)
 
-This means if you ask for *"songs like Bohemian Rhapsody,"* you'll get tracks that actually feel operatic, dramatic, and layered — not just a list of Queen's other hits or 70s rock bands.
+So *"songs like Bohemian Rhapsody"* in **Similar** mode returns tracks that feel operatic and layered, while **Influences** mode traces back to the artists that shaped Queen's sound.
 
 ## Project structure
 
