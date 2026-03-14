@@ -15,8 +15,9 @@ const els = {
   btnSave:          $("btn-save"),
   btnRetry:         $("btn-retry"),
   welcomeText:      $("welcome-text"),
-  promptInput:      $("prompt-input"),
   promptError:      $("prompt-error"),
+  seedSong:         $("seed-song"),
+  seedArtist:       $("seed-artist"),
   songCount:        $("song-count"),
   songCountLabel:   $("song-count-label"),
   discoveryMode:    $("discovery-mode"),
@@ -36,12 +37,14 @@ const els = {
 };
 
 const DISCOVERY_MODES = {
-  1: { key: "tight_match",        label: "Close",      desc: "Songs that sound nearly identical — same vibe, same era, minimal deviation." },
-  2: { key: "adjacent_discovery", label: "Adjacent",   desc: "Familiar feel, new finds — songs that share your input's DNA but expand your map." },
-  3: { key: "left_field",         label: "Left Field", desc: "Adventurous picks — unexpected genres and eras with underlying musical kinship." },
+  1: { key: "tight_match",        label: "Similar",    desc: "Songs that sound very similar — same mood, instrumentation, and energy. Accuracy over discovery." },
+  2: { key: "adjacent_discovery", label: "Explore",    desc: "Start close, then branch out into adjacent artists and scenes." },
+  3: { key: "influence_trail",    label: "Influences", desc: "Trace the musical lineage — artists and songs that shaped this sound." },
+  4: { key: "left_field",         label: "Surprise",   desc: "Unexpected connections that still make musical sense. Anything goes." },
 };
 
-let lastPrompt = "";
+let lastSeedSong = "";
+let lastSeedArtist = "";
 let currentSongs = [];
 let currentUris = [];
 
@@ -104,7 +107,7 @@ function setState(state, payload = {}) {
 // Core actions
 // ---------------------------------------------------------------------------
 
-async function fetchSongs(prompt) {
+async function fetchSongs(seedSong, seedArtist) {
   setState(State.LOADING, { message: "Claude is picking songs and checking Spotify\u2026" });
   const song_count = parseInt(els.songCount.value, 10);
   const mode = DISCOVERY_MODES[els.discoveryMode.value]?.key ?? "adjacent_discovery";
@@ -112,7 +115,7 @@ async function fetchSongs(prompt) {
     const resp = await fetch("/api/get-songs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, song_count, mode }),
+      body: JSON.stringify({ seed_song: seedSong, seed_artist: seedArtist, song_count, mode }),
     });
     const data = await resp.json();
     if (!resp.ok) {
@@ -133,7 +136,7 @@ async function fetchSongs(prompt) {
 async function savePlaylist() {
   setState(State.LOADING, { message: "Saving to Spotify\u2026" });
   const nameSuffix = els.playlistNameInput.value.trim();
-  const playlist_name = nameSuffix ? `AI Mix: ${nameSuffix}` : `AI Mix: ${lastPrompt.slice(0, 50)}`;
+  const playlist_name = nameSuffix ? `AI Mix: ${nameSuffix}` : `AI Mix: ${lastSeedArtist} — ${lastSeedSong}`;
   try {
     const resp = await fetch("/api/save-playlist", {
       method: "POST",
@@ -176,37 +179,41 @@ els.discoveryMode.addEventListener("input", () => {
 });
 
 els.btnGenerate.addEventListener("click", () => {
-  const prompt = els.promptInput.value.trim();
-  if (!prompt) {
+  const seedSong = els.seedSong.value.trim();
+  const seedArtist = els.seedArtist.value.trim();
+  if (!seedSong || !seedArtist) {
     els.promptError.classList.remove("hidden");
-    els.promptInput.focus();
+    (seedSong ? els.seedArtist : els.seedSong).focus();
     return;
   }
   els.promptError.classList.add("hidden");
-  lastPrompt = prompt;
-  fetchSongs(prompt);
+  lastSeedSong = seedSong;
+  lastSeedArtist = seedArtist;
+  fetchSongs(seedSong, seedArtist);
 });
 
 els.btnSave.addEventListener("click", () => savePlaylist());
 
 els.btnRegenerate.addEventListener("click", () => {
-  if (lastPrompt) fetchSongs(lastPrompt);
+  if (lastSeedSong && lastSeedArtist) fetchSongs(lastSeedSong, lastSeedArtist);
 });
 
 els.btnAnother.addEventListener("click", () => {
-  els.promptInput.value = "";
+  els.seedSong.value = "";
+  els.seedArtist.value = "";
   currentSongs = [];
   currentUris = [];
   setState(State.LOGGED_IN);
-  els.promptInput.focus();
+  els.seedSong.focus();
 });
 
 els.btnMakeAnother.addEventListener("click", () => {
-  els.promptInput.value = "";
+  els.seedSong.value = "";
+  els.seedArtist.value = "";
   currentSongs = [];
   currentUris = [];
   setState(State.LOGGED_IN);
-  els.promptInput.focus();
+  els.seedSong.focus();
 });
 
 els.btnRetry.addEventListener("click", () => setState(State.LOGGED_IN));

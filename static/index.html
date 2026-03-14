@@ -31,29 +31,31 @@
       <p class="welcome" id="welcome-text"></p>
 
       <div class="form-group">
-        <label for="prompt-input">Describe your playlist</label>
-        <textarea
-          id="prompt-input"
-          rows="3"
-          placeholder="e.g. upbeat 80s workout bangers, late night lo-fi study vibes, summer road trip indie rock..."
-        ></textarea>
-        <p class="error-msg hidden" id="prompt-error">Please enter a prompt first.</p>
+        <label for="seed-song">Song</label>
+        <input type="text" id="seed-song" placeholder="e.g. Bohemian Rhapsody" autocomplete="off" />
+      </div>
+
+      <div class="form-group">
+        <label for="seed-artist">Artist</label>
+        <input type="text" id="seed-artist" placeholder="e.g. Queen" autocomplete="off" />
+        <p class="error-msg hidden" id="prompt-error">Please enter both a song and artist.</p>
+      </div>
+
+      <div class="slider-group discovery-group">
+        <label>Mode: <span id="discovery-label">Explore</span></label>
+        <input type="range" id="discovery-mode" min="1" max="4" step="1" value="2" />
+        <div class="discovery-ticks">
+          <span>Similar</span>
+          <span>Explore</span>
+          <span>Influences</span>
+          <span>Surprise</span>
+        </div>
+        <p class="discovery-desc" id="discovery-desc">Start close, then branch out into adjacent artists and scenes.</p>
       </div>
 
       <div class="slider-group">
         <label for="song-count">Songs: <span id="song-count-label">15</span></label>
         <input type="range" id="song-count" min="10" max="30" step="5" value="15" />
-      </div>
-
-      <div class="slider-group discovery-group">
-        <label>Discovery: <span id="discovery-label">Adjacent</span></label>
-        <input type="range" id="discovery-mode" min="1" max="3" step="1" value="2" />
-        <div class="discovery-ticks">
-          <span>Close</span>
-          <span>Adjacent</span>
-          <span>Left Field</span>
-        </div>
-        <p class="discovery-desc" id="discovery-desc">Familiar feel, new finds — songs that share your input's DNA but expand your map.</p>
       </div>
 
       <button id="btn-generate" class="btn btn-spotify">

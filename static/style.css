@@ -156,7 +156,8 @@ header {
   margin-bottom: 8px;
 }
 
-textarea {
+textarea,
+input[type="text"] {
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--surface2);
@@ -165,17 +166,22 @@ textarea {
   font-size: 16px;
   line-height: 1.5;
   padding: 12px 14px;
-  resize: vertical;
   outline: none;
   transition: border-color 0.15s;
   font-family: inherit;
 }
 
-textarea:focus {
+textarea {
+  resize: vertical;
+}
+
+textarea:focus,
+input[type="text"]:focus {
   border-color: var(--green);
 }
 
-textarea::placeholder {
+textarea::placeholder,
+input[type="text"]::placeholder {
   color: var(--text-muted);
 }
 
@@ -309,7 +315,7 @@ textarea::placeholder {
 
 /* Discovery slider */
 .discovery-group {
-  margin-top: 16px;
+  margin-bottom: 16px;
 }
 
 .discovery-ticks {
@@ -321,12 +327,17 @@ textarea::placeholder {
 .discovery-ticks span {
   font-size: 11px;
   color: var(--text-muted);
+  width: 25%;
+  text-align: center;
 }
+
+.discovery-ticks span:first-child { text-align: left; }
+.discovery-ticks span:last-child  { text-align: right; }
 
 .discovery-desc {
   font-size: 12px;
   color: var(--text-muted);
-  margin-top: 6px;
+  margin-top: 8px;
   line-height: 1.5;
   min-height: 2.5em;
 }

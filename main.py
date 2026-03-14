@@ -54,21 +54,50 @@ CRITICAL: Respond with ONLY a JSON array. Each item has 'title' and 'artist' key
 Example: [{"title": "Piano Man", "artist": "Billy Joel"}]"""
 
 MODE_PROMPTS = {
-    "tight_match": (
-        "DISCOVERY MODE: tight_match — Stay as close as possible to the input. "
-        "Recommend songs that are near-identical in sound, production, mood, tempo, and genre. "
-        "Same instrumentation style, same emotional register, same general era. Minimal deviation."
-    ),
-    "adjacent_discovery": (
-        "DISCOVERY MODE: adjacent_discovery — Balance familiarity with discovery. "
-        "Recommend songs that clearly share musical DNA with the input but introduce the listener "
-        "to adjacent artists, subgenres, or eras they may not know."
-    ),
-    "left_field": (
-        "DISCOVERY MODE: left_field — Be adventurous. Recommend songs that share underlying musical or emotional DNA "
-        "with the input but come from unexpected genres, eras, or subcultures. "
-        "Make connections that aren't obvious but are musically defensible. Push well beyond the expected."
-    ),
+    "tight_match": """\
+Mode: tight_match
+
+Seed song: {SONG}
+Seed artist: {ARTIST}
+
+Recommend {COUNT} songs that sound very similar to the seed.
+
+Stay close to the seed's sound, mood, instrumentation, production style, and energy level.
+Favor accuracy over discovery.
+
+Do not include the seed song.""",
+
+    "adjacent_discovery": """\
+Mode: adjacent_discovery
+
+Seed song: {SONG}
+Seed artist: {ARTIST}
+
+Recommend {COUNT} songs related to the seed.
+
+Start close to the seed's sound, then explore outward into adjacent artists, genres, or scenes while remaining musically credible.
+
+Balance similarity with discovery.""",
+
+    "influence_trail": """\
+Mode: influence_trail
+
+Seed song: {SONG}
+Seed artist: {ARTIST}
+
+Recommend {COUNT} songs that help explain the musical influences behind this sound.
+
+Favor songs by artists that likely influenced the seed artist or share the stylistic lineage.""",
+
+    "left_field": """\
+Mode: left_field
+
+Seed song: {SONG}
+Seed artist: {ARTIST}
+
+Recommend {COUNT} surprising songs inspired by the seed.
+
+Allow unexpected connections, but every recommendation must still make musical sense to someone who likes the seed.""",
 }
 
 # ---------------------------------------------------------------------------
@@ -135,15 +164,14 @@ async def refresh_token_if_needed(session: dict) -> dict:
 # Claude helper
 # ---------------------------------------------------------------------------
 
-def get_songs_from_claude(prompt: str, song_count: int = 15, mode: str = "adjacent_discovery") -> list[dict]:
+def get_songs_from_claude(seed_song: str, seed_artist: str, song_count: int = 15, mode: str = "adjacent_discovery") -> list[dict]:
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-    mode_instruction = MODE_PROMPTS.get(mode, MODE_PROMPTS["adjacent_discovery"])
+    template = MODE_PROMPTS.get(mode, MODE_PROMPTS["adjacent_discovery"])
     user_message = (
-        f"{mode_instruction}\n\n"
-        f'Generate {song_count} song recommendations for a playlist described as: "{prompt}"\n\n'
-        f"Return exactly {song_count} songs as a JSON array with 'title' and 'artist' keys only. "
+        template.format(SONG=seed_song, ARTIST=seed_artist, COUNT=song_count)
+        + "\n\nReturn the results as a JSON array with 'title' and 'artist' keys only. "
         "Make them well-known enough to be findable on Spotify. "
-        "Vary the artists — do not repeat the same artist more than twice."
+        "Do not repeat the same artist more than twice."
     )
     response = client.messages.create(
         model="claude-sonnet-4-6",
@@ -304,7 +332,8 @@ async def auth_logout(request: Request):
 # ---------------------------------------------------------------------------
 
 class GenerateRequest(BaseModel):
-    prompt: str
+    seed_song: str
+    seed_artist: str
     song_count: int = 15
     mode: str = "adjacent_discovery"
 
@@ -323,9 +352,10 @@ async def get_songs(request: Request, body: GenerateRequest):
     if not session:
         raise HTTPException(status_code=401, detail="Not logged in")
 
-    prompt = body.prompt.strip()
-    if not prompt:
-        raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+    seed_song = body.seed_song.strip()
+    seed_artist = body.seed_artist.strip()
+    if not seed_song or not seed_artist:
+        raise HTTPException(status_code=400, detail="Seed song and artist are required")
 
     try:
         session = await refresh_token_if_needed(session)
@@ -334,11 +364,10 @@ async def get_songs(request: Request, body: GenerateRequest):
 
     access_token = session["access_token"]
     song_count = max(5, min(50, body.song_count))
-
-    mode = body.mode if body.mode in ("tight_match", "adjacent_discovery", "left_field") else "adjacent_discovery"
+    mode = body.mode if body.mode in MODE_PROMPTS else "adjacent_discovery"
 
     try:
-        songs = get_songs_from_claude(prompt, song_count, mode)
+        songs = get_songs_from_claude(seed_song, seed_artist, song_count, mode)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Claude error: {str(e)}")
 
