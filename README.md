@@ -1,5 +1,5 @@
  
- # Spotify AI Playlist Generator
+ # Claude Spotify Playlist Generator
 
 Generate Spotify playlists from a seed track or artist using Claude AI and Last.fm. Enter a song or artist, pick a discovery mode, and get a verified playlist saved directly to your Spotify account.
 
