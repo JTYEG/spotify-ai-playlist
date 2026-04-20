@@ -15,7 +15,7 @@
         </svg>
         <span>AI Playlist Generator</span>
       </div>
-      <p class="subtitle">Describe a mood — Claude picks the songs, Spotify saves the playlist.</p>
+      <p class="subtitle">Enter a seed track, blend two artists, or describe a mood — Claude ranks the songs, Spotify saves the playlist.</p>
     </header>
 
     <!-- LOGGED OUT STATE -->
@@ -27,7 +27,7 @@
 
     <!-- LOGGED IN STATE -->
     <section id="section-logged-in" class="hidden">
-      <p class="version-label">v1.0</p>
+      <p class="version-label">v1.1 &middot; model: Claude Haiku 4.5</p>
       <p class="welcome" id="welcome-text"></p>
 
       <!-- TASTE PROFILE SECTION -->
@@ -70,18 +70,47 @@
       </div>
 
       <div class="form-group">
-        <label for="prompt-input">Describe your playlist</label>
+        <div class="seed-label-row">
+          <label for="seed-input">Seed <span class="label-hint">(artist, artist&nbsp;&mdash;&nbsp;track, or two artists with +)</span></label>
+          <button id="btn-now-playing" class="btn-now-playing" title="Use currently playing track">&#9654; Now playing</button>
+        </div>
+        <input type="text" id="seed-input" placeholder="e.g. New Order - Blue Monday or Radiohead + Aphex Twin" autocomplete="off" />
+        <div id="genre-pills" class="genre-pills hidden"></div>
+        <p id="genre-blend-hint" class="genre-blend-hint hidden">Two genres selected — will blend both pools</p>
+      </div>
+
+      <div class="form-group">
+        <label for="prompt-input">Description <span class="label-hint">(optional — or use instead of seed for mood-only)</span></label>
         <textarea
           id="prompt-input"
-          rows="3"
-          placeholder="e.g. upbeat 80s workout bangers, late night lo-fi study vibes, summer road trip indie rock..."
+          rows="2"
+          placeholder="e.g. melancholic late night cinematic — or leave seed empty for mood-only mode"
         ></textarea>
-        <p class="error-msg hidden" id="prompt-error">Please enter a prompt first.</p>
+        <p class="error-msg hidden" id="prompt-error">Please enter a seed or a mood description.</p>
+      </div>
+
+      <div class="slider-group discovery-group">
+        <label>Mode: <span id="discovery-label">Explore</span></label>
+        <input type="range" id="discovery-mode" min="1" max="4" step="1" value="2" />
+        <div class="discovery-ticks">
+          <span>Similar</span>
+          <span>Explore</span>
+          <span>Influences</span>
+          <span>Surprise</span>
+        </div>
+        <p class="discovery-desc" id="discovery-desc">Start close, then branch out into adjacent artists and scenes.</p>
       </div>
 
       <div class="slider-group">
         <label for="song-count">Songs: <span id="song-count-label">15</span></label>
         <input type="range" id="song-count" min="10" max="30" step="5" value="15" />
+      </div>
+
+      <div class="toggle-group">
+        <label class="toggle-label">
+          <input type="checkbox" id="show-reasons" />
+          <span>Show why each track was picked — <span id="reasons-status" style="color:var(--error);font-weight:700;">OFF</span></span>
+        </label>
       </div>
 
       <button id="btn-generate" class="btn btn-spotify">
@@ -97,6 +126,7 @@
       <!-- PREVIEW STATE -->
       <div id="section-preview" class="hidden preview-card">
         <p class="result-label">Claude's picks — looking good?</p>
+        <p id="token-info" class="token-info hidden"></p>
         <ol id="preview-list" class="song-list"></ol>
         <div class="playlist-name-group">
           <label for="playlist-name-input">Playlist name</label>
