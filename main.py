@@ -111,6 +111,88 @@ async def refresh_token_if_needed(session: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Artist blend helpers
+# ---------------------------------------------------------------------------
+
+async def search_artist(access_token: str, artist_name: str) -> dict | None:
+    """Search for an artist and return their top track info."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{SPOTIFY_API_BASE}/search",
+            params={"q": f"artist:{artist_name}", "type": "track", "limit": 5},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    if resp.status_code != 200:
+        return None
+    tracks = resp.json().get("tracks", {}).get("items", [])
+    if not tracks:
+        return None
+    # Collect all artist URis from top 5 tracks to get audio features
+    artist_uris = set()
+    for t in tracks:
+        for a in t["artists"]:
+            if a.get("uri"):
+                artist_uris.add(a["uri"])
+    return {
+        "name": artist_name,
+        "artist_uris": list(artist_uris),
+        "top_track": tracks[0],
+    }
+
+
+async def fetch_artist_audio_features(access_token: str, artist_uris: list[str]) -> dict | None:
+    """Fetch audio features for an artist's tracks."""
+    if not artist_uris:
+        return None
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{SPOTIFY_API_BASE}/audio-features/tracks",
+            params={"ids": ",".join(artist_uris)},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    if resp.status_code != 200:
+        return None
+    features = resp.json().get("tracks", [])
+    if not features:
+        return None
+    # Average the features
+    n = len(features)
+    return {
+        "danceability": sum(f.get("danceability", 0) for f in features) / n,
+        "energy": sum(f.get("energy", 0) for f in features) / n,
+        "valence": sum(f.get("valence", 0) for f in features) / n,
+        "acousticness": sum(f.get("acousticness", 0) for f in features) / n,
+        "instrumentalness": sum(f.get("instrumentalness", 0) for f in features) / n,
+        "liveness": sum(f.get("liveness", 0) for f in features) / n,
+        "speechiness": sum(f.get("speechiness", 0) for f in features) / n,
+        "tempo": sum(f.get("tempo", 0) for f in features) / n,
+        "loudness": sum(f.get("loudness", 0) for f in features) / n,
+    }
+
+
+def blend_features(feat_a: dict, feat_b: dict, weight: float = 0.5) -> dict:
+    """Blend two feature dicts. weight=0.5 is equal blend."""
+    keys = ["danceability", "energy", "valence", "acousticness", "instrumentalness", "liveness", "speechiness", "tempo", "loudness"]
+    blended = {}
+    for k in keys:
+        va = feat_a.get(k, 0) or 0
+        vb = feat_b.get(k, 0) or 0
+        blended[k] = va * (1 - weight) + vb * weight
+    return blended
+
+
+def describe_blend(artist_a: str, artist_b: str, feat_a: dict, feat_b: dict, blended: dict) -> str:
+    """Build a descriptive string for the blended artist profile."""
+    parts = [
+        f"Blended artists: {artist_a} + {artist_b}",
+        f"Blend profile: danceability={blended['danceability']:.2f}, energy={blended['energy']:.2f}, valence={blended['valence']:.2f}, acousticness={blended['acousticness']:.2f}, instrumentalness={blended['instrumentalness']:.2f}",
+        f"Artist A ({artist_a}) features: energy={feat_a.get('energy', 0):.2f}, valence={feat_a.get('valence', 0):.2f}, acousticness={feat_a.get('acousticness', 0):.2f}",
+        f"Artist B ({artist_b}) features: energy={feat_b.get('energy', 0):.2f}, valence={feat_b.get('valence', 0):.2f}, acousticness={feat_b.get('acousticness', 0):.2f}",
+    ]
+    return " | ".join(parts)
+
+
+# ---------------------------------------------------------------------------
 # Taste profile analysis
 # ---------------------------------------------------------------------------
 
@@ -278,7 +360,7 @@ def build_taste_profile_prompt(profile: dict) -> str:
 # Claude helper
 # ---------------------------------------------------------------------------
 
-def get_songs_from_claude(prompt: str, song_count: int = 15, taste_profile: str = "") -> list[dict]:
+def get_songs_from_claude(prompt: str, song_count: int = 15, taste_profile: str = "", blend_info: str = "") -> list[dict]:
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     user_message = (
         f'Generate {song_count} song recommendations for a playlist described as: "{prompt}"\n\n'
@@ -286,6 +368,8 @@ def get_songs_from_claude(prompt: str, song_count: int = 15, taste_profile: str 
         "Make them well-known enough to be findable on Spotify. "
         "Vary the artists — do not repeat the same artist more than twice."
     )
+    if blend_info:
+        user_message += f'\n\nArtist blend data: {blend_info}\nUse this to find songs that bridge both artists\' styles, tempos, and production aesthetics.'
     if taste_profile:
         user_message += f'\n\nYour personal taste profile: {taste_profile}\nUse this to tailor your recommendations to the user\'s actual listening preferences.'
     response = client.messages.create(
@@ -518,6 +602,24 @@ async def get_songs(request: Request, body: GenerateRequest):
     access_token = session["access_token"]
     song_count = max(5, min(50, body.song_count))
 
+    # Handle artist blending (e.g. "Radiohead + Aphex Twin")
+    blend_prompt = ""
+    if " + " in prompt:
+        parts = prompt.split(" + ", 1)
+        artist_a = parts[0].strip()
+        artist_b = parts[1].strip()
+        if artist_a and artist_b:
+            artist_info_a = await search_artist(access_token, artist_a)
+            artist_info_b = await search_artist(access_token, artist_b)
+            if artist_info_a and artist_info_b:
+                feat_a = await fetch_artist_audio_features(access_token, artist_info_a["artist_uris"])
+                feat_b = await fetch_artist_audio_features(access_token, artist_info_b["artist_uris"])
+                if feat_a and feat_b:
+                    blended = blend_features(feat_a, feat_b)
+                    blend_prompt = describe_blend(artist_a, artist_b, feat_a, feat_b, blended)
+                    # Replace the "+" prompt with a blend-aware description
+                    prompt = f"A musical blend of {artist_a} and {artist_b} — mix their styles, tempos, and sonic textures"
+
     # Fetch user's taste profile for personalization
     taste_profile_prompt = ""
     if body.use_personalization:
@@ -533,7 +635,7 @@ async def get_songs(request: Request, body: GenerateRequest):
             pass  # Proceed without personalization if profile fetch fails
 
     try:
-        songs = get_songs_from_claude(prompt, song_count, taste_profile_prompt)
+        songs = get_songs_from_claude(prompt, song_count, taste_profile_prompt, blend_prompt)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Claude error: {str(e)}")
 

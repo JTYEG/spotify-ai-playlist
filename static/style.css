@@ -579,3 +579,43 @@ textarea::placeholder {
   border-radius: 500px;
   margin-bottom: 8px;
 }
+
+/* Blend indicator */
+.blend-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(138, 43, 226, 0.15), rgba(29, 185, 84, 0.15));
+  border: 1px solid rgba(138, 43, 226, 0.3);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-top: 8px;
+}
+
+.blend-indicator.blending {
+  display: flex;
+}
+
+.blend-artist {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.blend-operator {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(138, 43, 226, 0.8);
+  margin: 0 4px;
+}
+
+.blend-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.blend-status span {
+  color: rgba(138, 43, 226, 0.8);
+  font-weight: 600;
+}

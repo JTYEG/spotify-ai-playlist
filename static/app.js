@@ -40,6 +40,8 @@ const els = {
   trackList:        $("track-list"),
   btnRefreshProfile: $("btn-refresh-profile"),
   btnUseProfile:    $("btn-use-profile"),
+  seedInput:        $("seed-input"),
+  blendIndicator:   $("blend-indicator"),
 };
 
 let lastPrompt = "";
@@ -47,6 +49,7 @@ let currentSongs = [];
 let currentUris = [];
 let tasteProfile = null;
 let usePersonalized = false;
+let blendArtists = null;
 
 function setState(state, payload = {}) {
   els.sectionLoggedOut.classList.add("hidden");
@@ -206,6 +209,34 @@ async function fetchTasteProfile() {
 }
 
 // ---------------------------------------------------------------------------
+// Artist blend detection
+// ---------------------------------------------------------------------------
+
+function updateBlendIndicator() {
+  const seed = els.seedInput.value.trim();
+  if (seed && " + " in seed) {
+    const parts = seed.split(" + ", 1);
+    if (parts[0].trim() && parts.length > 1) {
+      const artistA = parts[0].trim();
+      const artistB = parts[1].trim();
+      if (artistB) {
+        blendArtists = { a: artistA, b: artistB };
+        els.blendIndicator.innerHTML = `
+          <span class="blend-artist">${artistA}</span>
+          <span class="blend-operator">+</span>
+          <span class="blend-artist">${artistB}</span>
+          <span class="blend-status">→ <span>Blending styles</span></span>
+        `;
+        els.blendIndicator.classList.remove("hidden");
+        return;
+      }
+    }
+  }
+  blendArtists = null;
+  els.blendIndicator.classList.add("hidden");
+}
+
+// ---------------------------------------------------------------------------
 // Core actions
 // ---------------------------------------------------------------------------
 
@@ -273,6 +304,10 @@ els.songCount.addEventListener("input", () => {
   els.songCountLabel.textContent = els.songCount.value;
 });
 
+els.seedInput.addEventListener("input", () => {
+  updateBlendIndicator();
+});
+
 els.btnGenerate.addEventListener("click", () => {
   const prompt = els.promptInput.value.trim();
   if (!prompt) {
@@ -282,7 +317,11 @@ els.btnGenerate.addEventListener("click", () => {
   }
   els.promptError.classList.add("hidden");
   lastPrompt = prompt;
-  fetchSongs(prompt);
+  if (blendArtists) {
+    fetchSongs(prompt);
+  } else {
+    fetchSongs(prompt);
+  }
 });
 
 els.btnSave.addEventListener("click", () => savePlaylist());
@@ -291,18 +330,30 @@ els.btnRegenerate.addEventListener("click", () => {
   if (lastPrompt) fetchSongs(lastPrompt);
 });
 
+els.seedInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    els.btnGenerate.click();
+  }
+});
+
 els.btnAnother.addEventListener("click", () => {
   els.promptInput.value = "";
+  els.seedInput.value = "";
   currentSongs = [];
   currentUris = [];
+  blendArtists = null;
+  els.blendIndicator.classList.add("hidden");
   setState(State.LOGGED_IN);
   els.promptInput.focus();
 });
 
 els.btnMakeAnother.addEventListener("click", () => {
   els.promptInput.value = "";
+  els.seedInput.value = "";
   currentSongs = [];
   currentUris = [];
+  blendArtists = null;
+  els.blendIndicator.classList.add("hidden");
   setState(State.LOGGED_IN);
   els.promptInput.focus();
 });
